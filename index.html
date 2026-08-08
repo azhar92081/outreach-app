@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OutreachAI Agency CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0A0D14; color: #E2E8F0; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0F1219; }
+        ::-webkit-scrollbar-thumb { background: #1E2433; border-radius: 4px; }
+        .glass-panel { background-color: #12151E; border: 1px solid #1E2433; border-radius: 16px; }
+        .input-dark { background-color: #0A0D14; border: 1px solid #1E2433; color: white; transition: all 0.2s; }
+        .input-dark:focus { border-color: #3B82F6; outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); }
+    </style>
+</head>
+<body class="antialiased min-h-screen pb-20 pt-8">
+
+    <div class="max-w-7xl mx-auto px-6">
+
+        <header class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+            <div>
+                <h1 class="text-4xl font-extrabold tracking-tight mb-1 text-white">Outreach<span class="text-blue-500">AI</span></h1>
+                <h2 class="text-sm font-medium text-slate-400">Agency CRM & Automation</h2>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex gap-2 bg-[#12151E] p-1 rounded-xl border border-[#1E2433]">
+                    <button onclick="switchTab('list')" id="tab-list" class="bg-blue-600 text-white font-bold px-4 py-2 text-sm rounded-lg shadow transition">Campaign View</button>
+                    <button onclick="switchTab('crm')" id="tab-crm" class="text-slate-400 hover:text-white px-4 py-2 text-sm font-medium transition rounded-lg">Deal Pipeline</button>
+                </div>
+                <a href="/logout" class="text-slate-500 hover:text-red-400 text-sm font-medium transition px-3 py-1.5 rounded-lg border border-transparent hover:border-red-500/30 hover:bg-red-500/10">Logout</a>
+            </div>
+        </header>
+
+        <div id="alert-box" class="hidden fixed bottom-10 right-10 z-50 glass-panel p-4 flex items-center gap-3 transition-all duration-300 border-l-4 shadow-2xl min-w-[300px]">
+            <p id="alert-message" class="text-sm font-medium"></p>
+        </div>
+
+        <section id="view-list" class="block">
+            <!-- 🎯 FILTER BAR WITH MAX SUBS INPUT -->
+            <div class="mb-8 glass-panel p-5 flex flex-col md:flex-row gap-4 items-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-emerald-400 opacity-50"></div>
+
+                <select id="platform" class="input-dark w-full md:w-36 rounded-xl py-3 px-4 text-sm font-semibold">
+                    <option value="youtube">YouTube</option>
+                    <option value="tiktok">TikTok</option>
+                </select>
+
+                <input type="text" id="niche" placeholder="Enter Niche (e.g. Animation)" class="input-dark flex-1 rounded-xl py-3 px-4 text-sm">
+
+                <!-- Max Subs Filter Input Box -->
+                <div class="flex items-center gap-2 bg-[#0A0D14] border border-[#1E2433] rounded-xl px-3 py-2 shrink-0">
+                    <span class="text-xs text-slate-400 font-medium">Max Subs:</span>
+                    <input type="number" id="max-subs" value="5000" class="input-dark w-24 rounded-lg py-1 px-2 text-sm text-center font-bold">
+                </div>
+
+                <button onclick="runScraper()" id="s-btn" class="bg-[#10B981] hover:bg-[#059669] text-white font-bold py-3 px-8 rounded-xl shadow-lg shrink-0 transition">Start Scraping</button>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between mb-4 gap-4">
+                <h3 class="text-lg font-bold text-white">Active Outreach</h3>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="clearUnsent()" id="clear-btn" class="bg-[#EF4444] hover:bg-[#DC2626] text-white font-bold py-2 px-5 rounded-xl text-xs uppercase shadow transition">Clear Unsent</button>
+                    <button onclick="syncInbox()" id="sync-btn" class="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-bold py-2 px-5 rounded-xl text-xs uppercase shadow transition">Sync Inbox</button>
+                    <button onclick="runAI()" id="g-btn" class="bg-[#3B82F6] hover:bg-[#2563EB] text-white font-bold py-2 px-5 rounded-xl text-xs uppercase shadow transition">Generate Drafts</button>
+                </div>
+            </div>
+
+            <div class="glass-panel overflow-hidden mb-10">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left whitespace-nowrap">
+                        <thead class="bg-[#0A0D14] border-b border-[#1E2433] text-[10px] uppercase text-slate-500 font-bold tracking-wider">
+                            <tr>
+                                <th class="px-6 py-4">Channel Name</th>
+                                <th class="px-6 py-4">Contact</th>
+                                <th class="px-6 py-4">Status & Days</th>
+                                <th class="px-6 py-4 text-center">Stats</th>
+                                <th class="px-6 py-4 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="divide-y divide-[#1E2433] text-slate-300">
+                            <tr><td colspan="5" class="p-8 text-center text-slate-500 font-medium">Loading leads...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <section id="review-section" class="glass-panel p-8 transition-all duration-300 opacity-40 pointer-events-none relative border-l-4 border-l-blue-500">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-white">Human Review (Mandatory)</h3>
+                    <span id="review-target-name" class="hidden px-4 py-1.5 bg-blue-500/10 text-blue-400 text-xs font-bold rounded-full border border-blue-500/20"></span>
+                </div>
+                <div class="space-y-4">
+                    <input type="text" id="m-email" class="input-dark w-full rounded-xl py-3 px-4 text-sm" placeholder="Email Address">
+                    <textarea id="m-draft" rows="5" class="input-dark w-full rounded-xl py-4 px-4 text-sm resize-y" placeholder="Select 'Review' on a Draft Ready lead..."></textarea>
+                    <div class="flex justify-end">
+                        <button onclick="approve()" id="send-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg text-sm transition">Approve & Send</button>
+                    </div>
+                </div>
+            </section>
+        </section>
+
+        <section id="view-crm" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="glass-panel p-4 flex flex-col h-[700px]">
+                    <h4 class="text-[11px] font-bold uppercase text-purple-400 mb-4 tracking-wider flex justify-between items-center">Warm Replies <span id="c-reply" class="bg-purple-900/50 px-2 py-0.5 rounded text-xs">0</span></h4>
+                    <div id="col-replied" class="flex-1 overflow-y-auto space-y-3 pb-4"></div>
+                </div>
+                <div class="glass-panel p-4 flex flex-col h-[700px] border-t-2 border-t-yellow-500">
+                    <h4 class="text-[11px] font-bold uppercase text-yellow-400 mb-4 tracking-wider flex justify-between items-center">Samples Sent <span id="c-sample" class="bg-yellow-900/50 px-2 py-0.5 rounded text-xs">0</span></h4>
+                    <div id="col-sample" class="flex-1 overflow-y-auto space-y-3 pb-4"></div>
+                </div>
+                <div class="glass-panel p-4 flex flex-col h-[700px] border-t-2 border-t-orange-500">
+                    <h4 class="text-[11px] font-bold uppercase text-orange-400 mb-4 tracking-wider flex justify-between items-center">In Negotiation <span id="c-nego" class="bg-orange-900/50 px-2 py-0.5 rounded text-xs">0</span></h4>
+                    <div id="col-negotiation" class="flex-1 overflow-y-auto space-y-3 pb-4"></div>
+                </div>
+                <div class="glass-panel p-4 flex flex-col h-[700px] border-t-2 border-t-emerald-500">
+                    <h4 class="text-[11px] font-bold uppercase text-emerald-400 mb-4 tracking-wider flex justify-between items-center">Closed / Won <span id="c-won" class="bg-emerald-900/50 px-2 py-0.5 rounded text-xs">0</span></h4>
+                    <div id="col-won" class="flex-1 overflow-y-auto space-y-3 pb-4"></div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        let leads = [], activeLeadId = null;
+
+        function showAlert(msg, isError=false) {
+            const box = document.getElementById('alert-box');
+            const txt = document.getElementById('alert-message');
+            box.classList.remove('hidden', 'border-emerald-500', 'bg-emerald-900/20', 'text-emerald-400', 'border-red-500', 'bg-red-900/20', 'text-red-400');
+            if (isError) box.classList.add('border-red-500', 'bg-red-900/20', 'text-red-400');
+            else box.classList.add('border-emerald-500', 'bg-emerald-900/20', 'text-emerald-400');
+            txt.innerText = msg;
+            setTimeout(() => box.classList.add('hidden'), 5000);
+        }
+
+        function switchTab(tab) {
+            document.getElementById('view-list').classList.toggle('hidden', tab !== 'list');
+            document.getElementById('view-crm').classList.toggle('hidden', tab !== 'crm');
+            document.getElementById('tab-list').className = tab === 'list' ? "bg-blue-600 text-white font-bold px-4 py-2 text-sm rounded-lg shadow transition" : "text-slate-400 hover:text-white px-4 py-2 text-sm font-medium transition rounded-lg";
+            document.getElementById('tab-crm').className = tab === 'crm' ? "bg-blue-600 text-white font-bold px-4 py-2 text-sm rounded-lg shadow transition" : "text-slate-400 hover:text-white px-4 py-2 text-sm font-medium transition rounded-lg";
+        }
+
+        async function apiFetch(url, options = {}) {
+            if (!options.headers) options.headers = {};
+            options.headers['Content-Type'] = 'application/json';
+            options.credentials = 'include';
+
+            try {
+                const res = await fetch(url, options);
+                if (res.status === 401) {
+                    showAlert("Session expired. Please refresh and log in again.", true);
+                    throw new Error("Unauthorized");
+                }
+                const contentType = res.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    throw new Error("Server returned HTML instead of JSON.");
+                }
+                return res;
+            } catch (e) {
+                console.error("Fetch Error:", e);
+                throw e;
+            }
+        }
+
+        async function load() {
+            try {
+                const res = await apiFetch('/api/leads');
+                const data = await res.json();
+                if(data.success) {
+                    leads = data.leads;
+                    renderTable();
+                    renderCRM();
+                } else {
+                    document.getElementById('table-body').innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-500">${data.error}</td></tr>`;
+                }
+            } catch(e) {
+                document.getElementById('table-body').innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-500">Failed to connect to server.</td></tr>`;
+            }
+        }
+
+        function getStatusColor(status) {
+            if(status === 'Pending') return 'bg-slate-800 text-slate-400';
+            if(status === 'Draft Ready') return 'bg-blue-900/50 text-blue-400 border border-blue-500/30';
+            if(status === 'Sent' || status === 'Follow-Up Ready') return 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/30';
+            if(status === 'Replied') return 'bg-purple-900/50 text-purple-400 border border-purple-500/30';
+            return 'bg-slate-800 text-slate-400';
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            const tableLeads = leads.filter(l => !['Replied', 'Won', 'Lost', 'Negotiating'].includes(l.status));
+
+            if(tableLeads.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500 font-medium">No active leads found. Run a scrape!</td></tr>`;
+                return;
+            }
+
+            tableLeads.forEach((l, index) => {
+                const realIndex = leads.findIndex(ld => ld.id === l.id);
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-[#12151E] transition-colors group";
+
+                let actionBtn = '-';
+                if(l.status === 'Draft Ready') {
+                    actionBtn = `<button onclick="openReview(${realIndex}, ${l.id})" class="text-blue-400 hover:text-white bg-blue-500/10 hover:bg-blue-500/20 px-4 py-1.5 rounded-lg text-xs font-bold transition border border-blue-500/20">Review Draft</button>`;
+                } else if(l.status === 'Follow-Up Ready') {
+                    actionBtn = `<button onclick="triggerFollowup(${l.id})" class="text-orange-400 hover:text-white bg-orange-500/10 hover:bg-orange-500/20 px-4 py-1.5 rounded-lg text-xs font-bold transition border border-orange-500/20">Follow Up</button>`;
+                }
+
+                let statsHtml = `<span class="text-slate-500">Unopened</span>`;
+                if(l.opened) statsHtml = `<span class="bg-emerald-900/30 text-emerald-400 px-2 py-1 rounded text-[10px] font-bold tracking-wide flex items-center gap-1 justify-center w-fit mx-auto border border-emerald-500/20"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg> Opened</span>`;
+
+                let daysAgo = "0";
+                if(l.last_contacted) {
+                    const diffTime = Math.abs(new Date() - new Date(l.last_contacted + 'Z'));
+                    daysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    if(l.status === 'Sent' && daysAgo >= 3) {
+                        l.status = 'Follow-Up Ready';
+                        actionBtn = `<button onclick="triggerFollowup(${l.id})" class="text-orange-400 hover:text-white bg-orange-500/10 hover:bg-orange-500/20 px-4 py-1.5 rounded-lg text-xs font-bold transition border border-orange-500/20">Follow Up</button>`;
+                    }
+                }
+
+                let channelHtml = `<div class="font-bold text-white mb-0.5">${l.channel_name}</div>`;
+                if (l.channel_url) {
+                    channelHtml = `<a href="${l.channel_url}" target="_blank" class="font-bold text-white mb-0.5 hover:text-blue-400 hover:underline transition flex items-center gap-1 w-fit">
+                                    ${l.channel_name}
+                                    <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                   </a>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4">
+                        ${channelHtml}
+                        <div class="text-xs text-blue-400 font-medium">${l.subscribers} <span class="text-slate-600 px-1">&bull;</span> ${l.niche}</div>
+                    </td>
+                    <td class="px-6 py-4 text-slate-400 text-xs">${l.email}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${getStatusColor(l.status)}">${l.status}</span>
+                        ${l.last_contacted ? `<div class="text-[10px] text-slate-500 mt-1.5 ml-1 font-medium">${daysAgo} days ago</div>` : ''}
+                    </td>
+                    <td class="px-6 py-4 text-center">${statsHtml}</td>
+                    <td class="px-6 py-4 text-right">${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderCRM() {
+            const cols = {
+                replied: document.getElementById('col-replied'),
+                sample: document.getElementById('col-sample'),
+                negotiation: document.getElementById('col-negotiation'),
+                won: document.getElementById('col-won')
+            };
+
+            Object.values(cols).forEach(c => c.innerHTML = '');
+            const counts = { replied: 0, sample: 0, negotiation: 0, won: 0 };
+
+            leads.filter(l => ['Replied', 'Won', 'Lost', 'Negotiating'].includes(l.status)).forEach(l => {
+                const card = document.createElement('div');
+                card.className = "bg-[#1E2433] p-4 rounded-xl border border-slate-700/50 hover:border-slate-600 transition shadow-sm";
+
+                let badge = '';
+                if(l.sentiment === 'Interested') badge = '<span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-bold uppercase tracking-wide">Hot</span>';
+                else if(l.sentiment === 'Not Interested') badge = '<span class="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-bold uppercase tracking-wide">Dead</span>';
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <h5 class="font-bold text-sm text-white">${l.channel_name}</h5>
+                        ${badge}
+                    </div>
+                    <p class="text-xs text-slate-400 mb-3 line-clamp-2">${l.email}</p>
+                    <div class="flex gap-2">
+                        <select onchange="updateStage(${l.id}, this.value)" class="bg-[#0A0D14] border border-slate-700 text-xs rounded-lg px-2 py-1.5 text-slate-300 flex-1 outline-none focus:border-blue-500">
+                            <option value="Replied" ${l.status === 'Replied' ? 'selected' : ''}>Warm Reply</option>
+                            <option value="Negotiating" ${l.status === 'Negotiating' ? 'selected' : ''}>Negotiating</option>
+                            <option value="Won" ${l.status === 'Won' ? 'selected' : ''}>Closed / Won</option>
+                        </select>
+                    </div>
+                `;
+
+                if(l.status === 'Replied') { cols.replied.appendChild(card); counts.replied++; }
+                else if(l.status === 'Negotiating') { cols.negotiation.appendChild(card); counts.negotiation++; }
+                else if(l.status === 'Won') { cols.won.appendChild(card); counts.won++; }
+            });
+
+            document.getElementById('c-reply').innerText = counts.replied;
+            document.getElementById('c-sample').innerText = counts.sample;
+            document.getElementById('c-nego').innerText = counts.negotiation;
+            document.getElementById('c-won').innerText = counts.won;
+        }
+
+        async function updateStage(id, status) {
+            try {
+                const res = await apiFetch('/api/leads/stage', { method: 'POST', body: JSON.stringify({ id, status }) });
+                if(res.ok) load();
+            } catch(e) {}
+        }
+
+        async function runScraper() {
+            const btn = document.getElementById('s-btn');
+            const platform = document.getElementById('platform').value;
+            const niche = document.getElementById('niche').value;
+            const maxSubs = document.getElementById('max-subs').value || 5000;
+
+            btn.innerText = "Scraping..."; btn.disabled = true;
+            try {
+                const res = await apiFetch('/api/scrape', {
+                    method: 'POST',
+                    body: JSON.stringify({ keyword: niche, platform: platform, max_subs: parseInt(maxSubs) })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+                showAlert(`Scraped successfully! Found ${data.inserted} fresh new leads.`);
+                load();
+            } catch (e) {
+                showAlert(e.message, true);
+            }
+            finally {
+                btn.innerText = "Start Scraping"; btn.disabled = false;
+            }
+        }
+
+        async function runAI() {
+            const btn = document.getElementById('g-btn');
+            btn.innerText = "Drafting..."; btn.disabled = true;
+            try {
+                let generated = 0;
+                for(let l of leads) {
+                    if(l.status === 'Pending') {
+                        await apiFetch('/api/generate', { method: 'POST', body: JSON.stringify({ id: l.id }) });
+                        generated++;
+                    }
+                }
+                showAlert(`Drafts generated successfully for ${generated} leads!`);
+                load();
+            } catch (e) {
+                showAlert(e.message, true);
+            }
+            finally { btn.innerText = "Generate Drafts"; btn.disabled = false; }
+        }
+
+        async function triggerFollowup(id) {
+            try {
+                await apiFetch('/api/generate', { method: 'POST', body: JSON.stringify({ id: id, is_followup: true }) });
+                load();
+            } catch (e) { showAlert("Failed to generate follow up.", true); }
+        }
+
+        async function syncInbox() {
+            const btn = document.getElementById('sync-btn');
+            btn.innerText = "Syncing..."; btn.disabled = true;
+            try {
+                const res = await apiFetch('/api/sync_inbox', { method: 'POST' });
+                const data = await res.json();
+                showAlert(data.message, !data.success);
+                load();
+            } catch (e) { showAlert(e.message, true); }
+            finally { btn.innerText = "Sync Inbox"; btn.disabled = false; }
+        }
+
+        async function clearUnsent() {
+            if(!confirm("Are you sure? This will delete all leads in the 'Pending' and 'Draft Ready' stages.")) return;
+            const btn = document.getElementById('clear-btn');
+            btn.innerText = "Clearing..."; btn.disabled = true;
+            try {
+                await apiFetch('/api/leads/clear', { method: 'POST' });
+                showAlert("Cleared unsent leads.");
+                load();
+            } catch(e) { showAlert(e.message, true); }
+            finally { btn.innerText = "Clear Unsent"; btn.disabled = false; }
+        }
+
+        function openReview(index, dbId) {
+            activeLeadId = dbId;
+            const panel = document.getElementById('review-section');
+            document.getElementById('m-email').value = leads[index].email || '';
+            document.getElementById('m-draft').value = leads[index].draft || '';
+            document.getElementById('review-target-name').innerText = `Editing: ${leads[index].channel_name}`;
+            document.getElementById('review-target-name').classList.remove('hidden');
+            panel.classList.remove('opacity-40', 'pointer-events-none');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        async function approve() {
+            if (!activeLeadId) return;
+            const btn = document.getElementById('send-btn');
+            btn.innerText = "Sending..."; btn.disabled = true;
+            try {
+                const res = await apiFetch('/api/send', { method: 'POST', body: JSON.stringify({ id: activeLeadId, email: document.getElementById('m-email').value, draft: document.getElementById('m-draft').value }) });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                document.getElementById('review-section').classList.add('opacity-40', 'pointer-events-none');
+                document.getElementById('m-email').value = '';
+                document.getElementById('m-draft').value = '';
+                document.getElementById('review-target-name').classList.add('hidden');
+                activeLeadId = null;
+
+                showAlert("Email sent securely!");
+                load();
+            } catch (e) {
+                showAlert(e.message, true);
+            }
+            finally {
+                btn.innerText = "Approve & Send"; btn.disabled = false;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', load);
+    </script>
+</body>
+</html>

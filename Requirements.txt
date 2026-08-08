@@ -1,0 +1,6 @@
+﻿Flask3.0.0
+pandas2.2.0
+google-genai0.1.0
+gunicorn21.2.0
+requests2.31.0
+beautifulsoup44.12.3
