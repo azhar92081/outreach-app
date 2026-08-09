@@ -1,4 +1,3 @@
-Flask
-apify-client
-groq
-requests
+fastapi
+uvicorn
+pydantic[email]
