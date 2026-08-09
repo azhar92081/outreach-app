@@ -9,10 +9,12 @@ from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 
 # ==========================================
-# 1. Database Setup
+# 1. Database Setup (Vercel /tmp path compatible)
 # ==========================================
+DB_PATH = "/tmp/outreach.db"
+
 def init_db():
-    conn = sqlite3.connect("outreach.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS campaigns (
@@ -26,27 +28,26 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Start karte hi DB initialize ho jayegi
 init_db()
 
 # ==========================================
 # 2. App Initialization & Setup
 # ==========================================
-app = FastAPI(title="Outreach Tool API", version="1.2.0")
+app = FastAPI(title="Outreach Tool API", version="1.3.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Deployment ke waqt isko Vercel ke URL se replace kar denge
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ==========================================
-# 3. Email Credentials (YAHAN APNI DETAILS DAALO)
+# 3. Email Credentials
 # ==========================================
-GMAIL_SENDER = "tumhara.email@gmail.com"  
-GMAIL_APP_PASSWORD = "abcd efgh ijkl mnop" 
+GMAIL_SENDER = "tumhara.email@gmail.com"  # Apna Gmail address yahan likho
+GMAIL_APP_PASSWORD = "abcd efgh ijkl mnop" # Apna 16-character App Password yahan daalo
 
 # ==========================================
 # 4. Data Models
@@ -90,8 +91,7 @@ def process_outreach_campaign(campaign_id: int, campaign: CampaignPayload):
         personalized_message = campaign.message_body.replace("{{name}}", contact.name)
         send_real_email(contact, campaign.subject, personalized_message)
             
-    # Jab emails chali jayen toh DB mein status 'Completed' kar do
-    conn = sqlite3.connect("outreach.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("UPDATE campaigns SET status = 'Completed' WHERE id = ?", (campaign_id,))
     conn.commit()
@@ -103,7 +103,7 @@ def process_outreach_campaign(campaign_id: int, campaign: CampaignPayload):
 # ==========================================
 @app.get("/", tags=["System"])
 async def root():
-    return {"status": "Active", "message": "Backend with DB is live!"}
+    return {"status": "Active", "message": "Backend with Vercel DB is live!"}
 
 @app.post("/api/campaign/launch", tags=["Outreach"])
 async def launch_campaign(payload: CampaignPayload, background_tasks: BackgroundTasks):
@@ -111,8 +111,7 @@ async def launch_campaign(payload: CampaignPayload, background_tasks: Background
         if not payload.contacts:
             raise HTTPException(status_code=400, detail="Contacts list is empty.")
 
-        # Database mein naya campaign 'Processing' status ke sath save karo
-        conn = sqlite3.connect("outreach.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO campaigns (campaign_name, subject, total_contacts, status) VALUES (?, ?, ?, ?)",
@@ -122,12 +121,11 @@ async def launch_campaign(payload: CampaignPayload, background_tasks: Background
         conn.commit()
         conn.close()
 
-        # Background task run karo
         background_tasks.add_task(process_outreach_campaign, campaign_id, payload)
 
         return {
             "status": "success",
-            "message": f"Campaign saved to DB and queued for {len(payload.contacts)} contacts.",
+            "message": f"Campaign saved and queued for {len(payload.contacts)} contacts.",
             "campaign_id": campaign_id
         }
     except Exception as e:
@@ -135,8 +133,7 @@ async def launch_campaign(payload: CampaignPayload, background_tasks: Background
 
 @app.get("/api/campaigns", tags=["Outreach"])
 async def get_campaigns():
-    # Frontend par dashboard dikhane ke liye endpoint
-    conn = sqlite3.connect("outreach.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM campaigns ORDER BY id DESC")
     columns = [column[0] for column in cursor.description]
