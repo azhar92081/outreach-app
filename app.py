@@ -1,16 +1,13 @@
-import uvicorn
 import smtplib
 import sqlite3
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 
-# ==========================================
-# 1. Database Setup (Vercel /tmp path compatible)
-# ==========================================
+app = Flask(__name__)
+CORS(app) # Vercel aur Frontend ke connection ke liye CORS enable
+
 DB_PATH = "/tmp/outreach.db"
 
 def init_db():
@@ -30,116 +27,74 @@ def init_db():
 
 init_db()
 
-# ==========================================
-# 2. App Initialization & Setup
-# ==========================================
-app = FastAPI(title="Outreach Tool API", version="1.3.0")
+# Yahan apna Gmail aur App Password daalo
+GMAIL_SENDER = "tumhara.email@gmail.com"  
+GMAIL_APP_PASSWORD = "abcd efgh ijkl mnop" 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ==========================================
-# 3. Email Credentials
-# ==========================================
-GMAIL_SENDER = "tumhara.email@gmail.com"  # Apna Gmail address yahan likho
-GMAIL_APP_PASSWORD = "abcd efgh ijkl mnop" # Apna 16-character App Password yahan daalo
-
-# ==========================================
-# 4. Data Models
-# ==========================================
-class Contact(BaseModel):
-    name: str
-    email: EmailStr
-    company: Optional[str] = None
-
-class CampaignPayload(BaseModel):
-    campaign_name: str
-    subject: str
-    message_body: str
-    contacts: List[Contact]
-
-# ==========================================
-# 5. Core Logic
-# ==========================================
-def send_real_email(contact: Contact, subject: str, message: str):
+def send_real_email(contact_email, contact_name, subject, message):
     try:
         msg = MIMEMultipart()
         msg['From'] = GMAIL_SENDER
-        msg['To'] = contact.email
+        msg['To'] = contact_email
         msg['Subject'] = subject
         msg.attach(MIMEText(message, 'plain'))
 
         server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls() 
+        server.starttls()
         server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD)
         server.send_message(msg)
         server.quit()
         return True
     except Exception as e:
-        print(f"[❌ ERROR] {contact.email}: {e}")
+        print(f"Error: {e}")
         return False
 
-def process_outreach_campaign(campaign_id: int, campaign: CampaignPayload):
-    print(f"--- Processing Campaign ID: {campaign_id} ---")
-    
-    for contact in campaign.contacts:
-        personalized_message = campaign.message_body.replace("{{name}}", contact.name)
-        send_real_email(contact, campaign.subject, personalized_message)
-            
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE campaigns SET status = 'Completed' WHERE id = ?", (campaign_id,))
-    conn.commit()
-    conn.close()
-    print(f"--- Campaign ID {campaign_id} Completed! ---")
+@app.route("/", methods=["GET"])
+def root():
+    return jsonify({"status": "Active", "message": "Flask Backend on Vercel is live!"})
 
-# ==========================================
-# 6. API Endpoints
-# ==========================================
-@app.get("/", tags=["System"])
-async def root():
-    return {"status": "Active", "message": "Backend with Vercel DB is live!"}
-
-@app.post("/api/campaign/launch", tags=["Outreach"])
-async def launch_campaign(payload: CampaignPayload, background_tasks: BackgroundTasks):
+@app.route("/api/campaign/launch", methods=["POST"])
+def launch_campaign():
     try:
-        if not payload.contacts:
-            raise HTTPException(status_code=400, detail="Contacts list is empty.")
+        data = request.json
+        campaign_name = data.get("campaign_name")
+        subject = data.get("subject")
+        message_body = data.get("message_body")
+        contacts = data.get("contacts", [])
+
+        if not contacts:
+            return jsonify({"detail": "Contacts list is empty."}), 400
 
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO campaigns (campaign_name, subject, total_contacts, status) VALUES (?, ?, ?, ?)",
-            (payload.campaign_name, payload.subject, len(payload.contacts), "Processing...")
+            (campaign_name, subject, len(contacts), "Completed")
         )
-        campaign_id = cursor.lastrowid
         conn.commit()
         conn.close()
 
-        background_tasks.add_task(process_outreach_campaign, campaign_id, payload)
+        # Emails bhejne ka process
+        for contact in contacts:
+            personalized_message = message_body.replace("{{name}}", contact.get("name", ""))
+            send_real_email(contact.get("email"), contact.get("name"), subject, personalized_message)
 
-        return {
+        return jsonify({
             "status": "success",
-            "message": f"Campaign saved and queued for {len(payload.contacts)} contacts.",
-            "campaign_id": campaign_id
-        }
+            "message": f"Campaign executed successfully for {len(contacts)} contacts."
+        })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return jsonify({"detail": str(e)}), 500
 
-@app.get("/api/campaigns", tags=["Outreach"])
-async def get_campaigns():
+@app.route("/api/campaigns", methods=["GET"])
+def get_campaigns():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM campaigns ORDER BY id DESC")
     columns = [column[0] for column in cursor.description]
     results = [dict(zip(columns, row)) for row in cursor.fetchall()]
     conn.close()
-    return {"campaigns": results}
+    return jsonify({"campaigns": results})
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    app.run(host="0.0.0.0", port=8000)
